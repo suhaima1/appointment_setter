@@ -1,10 +1,6 @@
 import streamlit as st
 import os
-from groq import Groq
 import random
-
-from langchain.llms import HuggingFacePipeline
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 from langchain.chains import ConversationChain, LLMChain
 from langchain_core.prompts import (
