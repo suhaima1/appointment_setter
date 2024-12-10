@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import os
 
-from langchain.chains import RetrievalQA, StuffDocumentsChain
+from langchain.chains import RetrievalQA, StuffDocumentsChain, ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 from langchain.vectorstores import FAISS  # Replace with another vector store if needed
 from langchain.document_loaders import PyPDFLoader, Docx2txtLoader
@@ -123,37 +123,31 @@ def main():
     # If the user has asked a question,
     if st.button("Send"):
         if user_question and user_question.strip(): 
-            # Construct a chat prompt template using various components
-
-            # def retrieve_documents(query):
-            #     retriever = vector_store.as_retriever(search_kwargs={"k": 2})
-            #     docs = retriever.get_relevant_documents(query)
-            #     return "\n".join([doc.page_content for doc in docs])
-            # retriever_tool = Tool(
-            #     name="RetrieveCompanyDocs",
-            #     func=retrieve_documents,
-            #     description="Use this tool to answer questions about the company or specific documents."
-            # )
-
-            # # Define the list of tools
-            # tools = [retriever_tool]
             if vector_store:
                 custom_prompt = PromptTemplate(
-                template="""You are Alex from Proteus420 and your task is to let people know about the company.
-                Answer users queries in a professional and human like tone.
-                Context: {context}.""",
-                input_variables = ['context']
+                    input_variables=["context", "question", "chat_history"],
+                    template=f"""{system_prompt}
+                    Additional Context:
+                    {{context}}
+                    Chat History:
+                    {{chat_history}}
+                    User Query:
+                    {{question}}
+                    Your Response:
+                    """
                 )
-            
-                llm_chain = LLMChain(llm=groq_chat, prompt=custom_prompt, memory=st.session_state.memory)
-                doc_chain = StuffDocumentsChain(llm_chain=llm_chain, document_variable_name="context")
-                qa_chain = RetrievalQA(
+
+                # Integrate the custom prompt into the RAG pipeline
+                rag_chain = ConversationalRetrievalChain.from_llm(
+                    llm=groq_chat,
                     retriever=retriever,
-                    combine_documents_chain=doc_chain,
                     return_source_documents=True,
+                    combine_docs_chain_kwargs={"prompt": custom_prompt}
                 )
-                result = qa_chain({'query':user_question})
-                response = result['result']
+                history = []
+                for chat in st.session_state.chat_history:
+                    history.append((chat['human'],chat['AI']))
+                response = rag_chain({"question": user_question, "chat_history": history})['answer']
             else:
                 prompt = ChatPromptTemplate.from_messages(
                     [
