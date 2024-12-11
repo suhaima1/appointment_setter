@@ -1,6 +1,7 @@
 import streamlit as st
 import numpy as np
 import os
+import json
 
 from langchain.chains import RetrievalQA, StuffDocumentsChain, ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
@@ -74,7 +75,7 @@ def main():
     """
     This function is the main entry point of the application. It sets up the Groq client, the Streamlit interface, and handles the chat interaction.
     """
-
+    
     # The title and greeting message of the Streamlit application
     with open('greeting_message.txt', 'r') as file:
         greet = file.read()
@@ -85,17 +86,73 @@ def main():
     st.sidebar.title('Customization')
 
     uploaded_files = st.sidebar.file_uploader("Upload files", type=["pdf", "txt", "docx"], accept_multiple_files=True)
-    vector_store = process_uploaded_files(uploaded_files)
-    if uploaded_files and vector_store:
-        retriever = vector_store.as_retriever(search_kwargs={"k": 2})
 
-    with open('script.txt', 'r') as file2:
+    with open('script.txt', 'r', encoding='utf-8', errors='replace') as file2:
         script = file2.read()
     system_prompt = st.sidebar.text_area("System prompt:", value=script, height=200)
     if st.sidebar.button("Submit"):
         with open("script.txt", "w") as file:
             file.write(system_prompt)
         st.sidebar.success("System prompt updated!")
+
+    with open("prompt.json", "r") as file:
+        prompt_data = json.load(file)
+        def json_to_prompt(json_data):
+            # Extracting the instructions (if they exist in the provided JSON)
+            instructions = "\n".join(f"- {inst}" for inst in json_data.get("instructions", []))
+            
+            # Constructing the call script sections
+            script_parts = [
+                f"**Greeting**: {json_data['call_script']['greeting']}",
+                f"**Qualify Interest**: \n  - If yes: {json_data['call_script']['qualify_interest']['if_yes']}\n  - If no: {json_data['call_script']['qualify_interest']['if_no']}",
+                f"**Follow-Up No Challenge**: \n  - If yes: {json_data['call_script']['qualify_interest']['follow_up_no_challenge']['if_yes']}\n  - If no: {json_data['call_script']['qualify_interest']['follow_up_no_challenge']['if_no']}",
+                f"**Offer a Demo**: {json_data['call_script']['offer_demo']['if_challenge']}",
+                f"**Capture Details**: \n  - If single or satellite: {json_data['call_script']['offer_demo']['capture_details']['if_single_or_satellite']['ask_budget']}\n    - {json_data['call_script']['offer_demo']['capture_details']['if_single_or_satellite']['budget_options']['under_50k']}\n    - {json_data['call_script']['offer_demo']['capture_details']['if_single_or_satellite']['budget_options']['between_100k_500k']}",
+                f"**Capture Details**: \n  - If multinational: {json_data['call_script']['offer_demo']['capture_details']['if_multinational']['ask_budget']}\n    - {json_data['call_script']['offer_demo']['capture_details']['if_multinational']['budget_options']['between_100k_500k']}\n    - {json_data['call_script']['offer_demo']['capture_details']['if_multinational']['budget_options']['over_500k']}",
+                f"**Final Call to Action**: {json_data['call_script']['final_call_to_action']}"
+            ]
+            
+            # Combine the script parts into one large string
+            script_text = "\n\n".join(script_parts)
+            
+            # Return the formatted output
+            return f"Assistant Name: {json_data['assistant_name']} at {json_data['company']}\n\nInstructions:\n{instructions}\n\nCall Script:\n{script_text}"
+        prompt = json_to_prompt(prompt_data)
+        
+    vector_store = process_uploaded_files(uploaded_files)
+    if "rag_chain" not in st.session_state:
+        if uploaded_files and vector_store:
+            retriever = vector_store.as_retriever(search_kwargs={"k": 2})
+            custom_prompt = PromptTemplate(
+                input_variables=["context", "question", "chat_history"],
+                template=f"""
+                {prompt} 
+
+                Additional Context from Retrieved Documents:
+                {{context}}
+
+                Chat History (up to now):
+                {{chat_history}}
+
+                Guidelines:
+                1. Stick to the provided call script unless the user asks about unrelated topics.
+                2. Lead the conversation and proactively guide the user toward setting an appointment.
+                3. Use the retrieved context only for questions outside the scope of the script.
+                4. Avoid repeating the same responses unless explicitly requested.
+                5. Acknowledge the user's input and keep your responses concise.
+
+                User Query:
+                {{question}}
+
+                Your Response:"""
+            )
+            rag_chain = ConversationalRetrievalChain.from_llm(
+                        llm=groq_chat,
+                        retriever=retriever,
+                        return_source_documents=True,
+                        combine_docs_chain_kwargs={"prompt": custom_prompt}
+                    )
+            st.session_state.rag_chain = rag_chain
     
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [{'human': '', 'AI': greet}]
@@ -124,30 +181,17 @@ def main():
     if st.button("Send"):
         if user_question and user_question.strip(): 
             if vector_store:
-                custom_prompt = PromptTemplate(
-                    input_variables=["context", "question", "chat_history"],
-                    template=f"""{system_prompt}
-                    Additional Context:
-                    {{context}}
-                    Chat History:
-                    {{chat_history}}
-                    User Query:
-                    {{question}}
-                    Your Response:
-                    """
-                )
 
                 # Integrate the custom prompt into the RAG pipeline
-                rag_chain = ConversationalRetrievalChain.from_llm(
-                    llm=groq_chat,
-                    retriever=retriever,
-                    return_source_documents=True,
-                    combine_docs_chain_kwargs={"prompt": custom_prompt}
-                )
                 history = []
                 for chat in st.session_state.chat_history:
                     history.append((chat['human'],chat['AI']))
-                response = rag_chain({"question": user_question, "chat_history": history})['answer']
+
+                rag_chain = st.session_state.rag_chain
+                result = rag_chain({"question": user_question, "chat_history": history})
+                response = result['answer']
+                source = result['source_documents']
+              
             else:
                 prompt = ChatPromptTemplate.from_messages(
                     [
@@ -171,8 +215,10 @@ def main():
             st.session_state.chat_history.append(
                 {"human": user_question, "AI": response}
             )
+            print(st.session_state.chat_history)
+            print("*"*20)
             st.rerun()
-
+            
         else:
             st.warning("Please enter a message before sending.")
 
