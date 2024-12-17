@@ -81,7 +81,13 @@ def main():
         greet = file.read()
 
     st.title("Chat with Proteus420!")
-
+    if st.button("New Chat"):
+        st.session_state.chat_history = [{'human': '', 'AI': greet}]
+        st.session_state.memory = ConversationBufferWindowMemory(
+            k=15, memory_key="chat_history", return_messages=True
+        )
+        st.success("New chat started!")
+        
     # Add customization options to the sidebar
     # st.sidebar.title('Customization')
 
@@ -216,12 +222,6 @@ def main():
         else:
             st.warning("Please enter a message before sending.")
 
-    if st.button("New Chat"):
-        st.session_state.chat_history = [{'human': '', 'AI': greet}]
-        st.session_state.memory = ConversationBufferWindowMemory(
-            k=15, memory_key="chat_history", return_messages=True
-        )
-        st.success("New chat started!")
 
 if __name__ == "__main__":
     main()
