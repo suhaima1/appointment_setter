@@ -160,13 +160,6 @@ def main():
         st.session_state.memory = ConversationBufferWindowMemory(
             k=15, memory_key="chat_history", return_messages=True
         )
-
-    if st.sidebar.button("New Chat"):
-        st.session_state.chat_history = [{'human': '', 'AI': greet}]
-        st.session_state.memory = ConversationBufferWindowMemory(
-            k=15, memory_key="chat_history", return_messages=True
-        )
-        st.success("New chat started!")
         
     for message in st.session_state.chat_history:
         
@@ -222,6 +215,13 @@ def main():
             
         else:
             st.warning("Please enter a message before sending.")
+
+    if st.button("New Chat"):
+        st.session_state.chat_history = [{'human': '', 'AI': greet}]
+        st.session_state.memory = ConversationBufferWindowMemory(
+            k=15, memory_key="chat_history", return_messages=True
+        )
+        st.success("New chat started!")
 
 if __name__ == "__main__":
     main()
