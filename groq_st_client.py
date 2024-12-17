@@ -119,40 +119,40 @@ def main():
             return f"Assistant Name: {json_data['assistant_name']} at {json_data['company']}\n\nInstructions:\n{instructions}\n\nCall Script:\n{script_text}"
         prompt = json_to_prompt(prompt_data)
         
-    vector_store = process_uploaded_files(uploaded_files)
-    if "rag_chain" not in st.session_state:
-        if uploaded_files and vector_store:
-            retriever = vector_store.as_retriever(search_kwargs={"k": 2})
-            custom_prompt = PromptTemplate(
-                input_variables=["context", "question", "chat_history"],
-                template=f"""
-                {prompt} 
+    # vector_store = process_uploaded_files(uploaded_files)
+    # if "rag_chain" not in st.session_state:
+    #     if uploaded_files and vector_store:
+    #         retriever = vector_store.as_retriever(search_kwargs={"k": 2})
+    #         custom_prompt = PromptTemplate(
+    #             input_variables=["context", "question", "chat_history"],
+    #             template=f"""
+    #             {prompt} 
 
-                Additional Context from Retrieved Documents:
-                {{context}}
+    #             Additional Context from Retrieved Documents:
+    #             {{context}}
 
-                Chat History (up to now):
-                {{chat_history}}
+    #             Chat History (up to now):
+    #             {{chat_history}}
 
-                Guidelines:
-                1. Stick to the provided call script unless the user asks about unrelated topics.
-                2. Lead the conversation and proactively guide the user toward setting an appointment.
-                3. Use the retrieved context only for questions outside the scope of the script.
-                4. Avoid repeating the same responses unless explicitly requested.
-                5. Acknowledge the user's input and keep your responses concise.
+    #             Guidelines:
+    #             1. Stick to the provided call script unless the user asks about unrelated topics.
+    #             2. Lead the conversation and proactively guide the user toward setting an appointment.
+    #             3. Use the retrieved context only for questions outside the scope of the script.
+    #             4. Avoid repeating the same responses unless explicitly requested.
+    #             5. Acknowledge the user's input and keep your responses concise.
 
-                User Query:
-                {{question}}
+    #             User Query:
+    #             {{question}}
 
-                Your Response:"""
-            )
-            rag_chain = ConversationalRetrievalChain.from_llm(
-                        llm=groq_chat,
-                        retriever=retriever,
-                        return_source_documents=True,
-                        combine_docs_chain_kwargs={"prompt": custom_prompt}
-                    )
-            st.session_state.rag_chain = rag_chain
+    #             Your Response:"""
+    #         )
+    #         rag_chain = ConversationalRetrievalChain.from_llm(
+    #                     llm=groq_chat,
+    #                     retriever=retriever,
+    #                     return_source_documents=True,
+    #                     combine_docs_chain_kwargs={"prompt": custom_prompt}
+    #                 )
+    #         st.session_state.rag_chain = rag_chain
     
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = [{'human': '', 'AI': greet}]
@@ -180,6 +180,7 @@ def main():
     # If the user has asked a question,
     if st.button("Send"):
         if user_question and user_question.strip(): 
+            vector_store = False
             if vector_store:
 
                 # Integrate the custom prompt into the RAG pipeline
