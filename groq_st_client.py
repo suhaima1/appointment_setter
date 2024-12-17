@@ -87,8 +87,8 @@ def main():
 
     # uploaded_files = st.sidebar.file_uploader("Upload files", type=["pdf", "txt", "docx"], accept_multiple_files=True)
 
-    # with open('script.txt', 'r', encoding='utf-8', errors='replace') as file2:
-    #     script = file2.read()
+    with open('script.txt', 'r', encoding='utf-8', errors='replace') as file2:
+        system_prompt = file2.read()
     # system_prompt = st.sidebar.text_area("System prompt:", value=script, height=200)
     # if st.sidebar.button("Submit"):
     #     with open("script.txt", "w") as file:
