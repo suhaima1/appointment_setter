@@ -6,3 +6,4 @@ sentence_transformers==3.3.1
 faiss-cpu==1.9.0.post1
 pypdf==5.1.0
 docx2txt==0.8
+cerebras_cloud_sdk==1.15.0
