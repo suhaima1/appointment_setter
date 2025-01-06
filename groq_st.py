@@ -2,11 +2,10 @@ import os
 from dotenv import load_dotenv
 from cerebras.cloud.sdk import Cerebras
 import streamlit as st
-load_dotenv()
 
 client = Cerebras(
     # This is the default and can be omitted
-    api_key=os.environ.get("CEREBRAS_API_KEY")
+    api_key=st.secrets["CEREBRAS_API_KEY"]
 )
 
 # with open('script.txt', 'r', encoding='utf-8', errors='replace') as file2:
